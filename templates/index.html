@@ -179,8 +179,8 @@
             
             map = L.map('map').setView([lat, lon], 13);
             
-            // Dark map tiles (CartoDB Dark Matter)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            // Light high-legibility map tiles (CartoDB Voyager)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; OpenStreetMap &copy; CARTO',
                 maxZoom: 18
             }).addTo(map);
@@ -188,7 +188,7 @@
             // Custom Home Marker Icon
             const homeIcon = L.divIcon({
                 className: 'custom-home-icon',
-                html: '<i class="fa-solid fa-house-chimney" style="color: #ff3366; font-size: 20px;"></i>',
+                html: '<i class="fa-solid fa-house-chimney" style="color: #e11d48; font-size: 22px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));"></i>',
                 iconSize: [24, 24],
                 iconAnchor: [12, 12]
             });
@@ -204,9 +204,10 @@
             });
 
             radiusCircle = L.circle([lat, lon], {
-                color: '#00a2ff',
-                fillColor: '#00a2ff',
-                fillOpacity: 0.15,
+                color: '#0284c7',
+                fillColor: '#0284c7',
+                fillOpacity: 0.12,
+                weight: 2,
                 radius: radiusKm * 1000 // meters
             }).addTo(map);
 
@@ -305,9 +306,9 @@
                             if (!acMarkers[ac.hex]) {
                                 const planeIcon = L.divIcon({
                                     className: 'plane-marker',
-                                    html: `<i class="fa-solid fa-plane" style="transform: rotate(${ac.track - 90}deg); color: #00e5ff; font-size: 18px;"></i>`,
-                                    iconSize: [20, 20],
-                                    iconAnchor: [10, 10]
+                                    html: `<i class="fa-solid fa-plane" style="transform: rotate(${ac.track - 90}deg); color: #0284c7; font-size: 22px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));"></i>`,
+                                    iconSize: [22, 22],
+                                    iconAnchor: [11, 11]
                                 });
                                 acMarkers[ac.hex] = L.marker([ac.lat, ac.lon], { icon: planeIcon }).addTo(map);
                             } else {
