@@ -179,11 +179,32 @@
             
             map = L.map('map').setView([lat, lon], 13);
             
-            // Light high-legibility map tiles (CartoDB Voyager)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            // Bright Light Map Tile Layers
+            const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19
+            });
+
+            const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; OpenStreetMap &copy; CARTO',
-                maxZoom: 18
-            }).addTo(map);
+                maxZoom: 19
+            });
+
+            const esriStreets = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri',
+                maxZoom: 19
+            });
+
+            // Set OpenStreetMap Bright as default layer
+            osmStandard.addTo(map);
+
+            // Add map style switcher control in top-right
+            const baseMaps = {
+                "OpenStreetMap (Bright)": osmStandard,
+                "Carto Light (Clean)": cartoLight,
+                "Esri World Streets": esriStreets
+            };
+            L.control.layers(baseMaps).addTo(map);
 
             // Custom Home Marker Icon
             const homeIcon = L.divIcon({
@@ -206,8 +227,8 @@
             radiusCircle = L.circle([lat, lon], {
                 color: '#0284c7',
                 fillColor: '#0284c7',
-                fillOpacity: 0.12,
-                weight: 2,
+                fillOpacity: 0.15,
+                weight: 2.5,
                 radius: radiusKm * 1000 // meters
             }).addTo(map);
 
