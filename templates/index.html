@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADSB Proximity Monitor</title>
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet CSS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="navbar">
+            <div class="brand">
+                <i class="fa-solid fa-plane-radar brand-icon"></i>
+                <div>
+                    <h1>ADSB Proximity Monitor</h1>
+                    <p class="subtitle">Live Receiver Geofence & Discord Alerting</p>
+                </div>
+            </div>
+            <div class="status-pill" id="system-status-pill">
+                <span class="pulse-dot"></span>
+                <span id="system-status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon text-sky"><i class="fa-solid fa-tower-broadcast"></i></div>
+                <div class="stat-info">
+                    <span class="stat-label">Receiver Feed</span>
+                    <span class="stat-value" id="stat-receiver-host">pinas</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon text-emerald"><i class="fa-solid fa-plane-arrival"></i></div>
+                <div class="stat-info">
+                    <span class="stat-label">Active In-Range</span>
+                    <span class="stat-value" id="stat-active-count">0</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon text-amber"><i class="fa-solid fa-draw-polygon"></i></div>
+                <div class="stat-info">
+                    <span class="stat-label">Alert Radius</span>
+                    <span class="stat-value" id="stat-radius">2.0 km</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon text-purple"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <div class="stat-info">
+                    <span class="stat-label">Altitude Ceiling</span>
+                    <span class="stat-value" id="stat-altitude">10,000 ft</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Workspace: Map & Active Aircraft -->
+        <main class="grid-two-col">
+            <!-- Map Card -->
+            <div class="card map-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-map-location-dot"></i> Live Geofence Map</h2>
+                    <span class="card-tip">Click map to adjust Home position</span>
+                </div>
+                <div id="map"></div>
+            </div>
+
+            <!-- Active Aircraft Card -->
+            <div class="card active-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-plane"></i> Tracked Aircraft (&lt; 2km, &lt; 10,000ft)</h2>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Callsign</th>
+                                <th>Distance</th>
+                                <th>Altitude</th>
+                                <th>Speed</th>
+                                <th>Tracking Links</th>
+                            </tr>
+                        </thead>
+                        <tbody id="active-aircraft-tbody">
+                            <tr>
+                                <td colspan="5" class="empty-state">No aircraft currently in geofence</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- Configuration & Alert History -->
+        <section class="grid-two-col margin-top">
+            <!-- Config Form -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-sliders"></i> Monitor Settings</h2>
+                </div>
+                <form id="config-form" class="config-grid">
+                    <div class="form-group full-width">
+                        <label for="RECEIVER_URL"><i class="fa-solid fa-link"></i> ADSB Receiver URL / Hostname</label>
+                        <input type="text" id="RECEIVER_URL" name="RECEIVER_URL" placeholder="http://pinas/tar1090/data/aircraft.json" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="HOME_LAT"><i class="fa-solid fa-location-dot"></i> Home Latitude</label>
+                        <input type="number" step="0.0001" id="HOME_LAT" name="HOME_LAT" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="HOME_LON"><i class="fa-solid fa-location-dot"></i> Home Longitude</label>
+                        <input type="number" step="0.0001" id="HOME_LON" name="HOME_LON" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ALERT_RADIUS_KM"><i class="fa-solid fa-circle-ruler"></i> Alert Radius (KM)</label>
+                        <input type="number" step="0.1" id="ALERT_RADIUS_KM" name="ALERT_RADIUS_KM" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="MAX_ALTITUDE_FT"><i class="fa-solid fa-mountain"></i> Max Altitude (FT)</label>
+                        <input type="number" step="500" id="MAX_ALTITUDE_FT" name="MAX_ALTITUDE_FT" required>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="DISCORD_WEBHOOK_URL"><i class="fa-brands fa-discord"></i> Discord Webhook URL</label>
+                        <input type="url" id="DISCORD_WEBHOOK_URL" name="DISCORD_WEBHOOK_URL" placeholder="https://discord.com/api/webhooks/...">
+                    </div>
+
+                    <div class="form-actions full-width">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
+                        <button type="button" id="btn-test-alert" class="btn btn-secondary"><i class="fa-paper-plane"></i> Send Test Discord Alert</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Recent History -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-clock-rotate-left"></i> Recent Alert History</h2>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Ident</th>
+                                <th>Distance</th>
+                                <th>Tracking Links</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                            <tr>
+                                <td colspan="4" class="empty-state">No alerts recorded yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Leaflet JS & App Script -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map, homeMarker, radiusCircle;
+        const acMarkers = {};
+
+        function initMap(lat, lon, radiusKm) {
+            if (map) return;
+            
+            map = L.map('map').setView([lat, lon], 13);
+            
+            // Dark map tiles (CartoDB Dark Matter)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                maxZoom: 18
+            }).addTo(map);
+
+            // Custom Home Marker Icon
+            const homeIcon = L.divIcon({
+                className: 'custom-home-icon',
+                html: '<i class="fa-solid fa-house-chimney" style="color: #ff3366; font-size: 20px;"></i>',
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
+            homeMarker = L.marker([lat, lon], { icon: homeIcon, draggable: true }).addTo(map);
+            homeMarker.bindPopup("<b>Home Position</b><br>Drag to update location.");
+
+            homeMarker.on('dragend', function(e) {
+                const pos = e.target.getLatLng();
+                document.getElementById('HOME_LAT').value = pos.lat.toFixed(4);
+                document.getElementById('HOME_LON').value = pos.lon.toFixed(4);
+                updateMapGeofence(pos.lat, pos.lon, parseFloat(document.getElementById('ALERT_RADIUS_KM').value) || 2.0);
+            });
+
+            radiusCircle = L.circle([lat, lon], {
+                color: '#00a2ff',
+                fillColor: '#00a2ff',
+                fillOpacity: 0.15,
+                radius: radiusKm * 1000 // meters
+            }).addTo(map);
+
+            map.on('click', function(e) {
+                homeMarker.setLatLng(e.latlng);
+                document.getElementById('HOME_LAT').value = e.latlng.lat.toFixed(4);
+                document.getElementById('HOME_LON').value = e.latlng.lng.toFixed(4);
+                updateMapGeofence(e.latlng.lat, e.latlng.lng, parseFloat(document.getElementById('ALERT_RADIUS_KM').value) || 2.0);
+            });
+        }
+
+        function updateMapGeofence(lat, lon, radiusKm) {
+            if (!map) return;
+            homeMarker.setLatLng([lat, lon]);
+            radiusCircle.setLatLng([lat, lon]);
+            radiusCircle.setRadius(radiusKm * 1000);
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const cfg = await res.json();
+                
+                document.getElementById('RECEIVER_URL').value = cfg.RECEIVER_URL || '';
+                document.getElementById('HOME_LAT').value = cfg.HOME_LAT || 37.7749;
+                document.getElementById('HOME_LON').value = cfg.HOME_LON || -122.4194;
+                document.getElementById('ALERT_RADIUS_KM').value = cfg.ALERT_RADIUS_KM || 2.0;
+                document.getElementById('MAX_ALTITUDE_FT').value = cfg.MAX_ALTITUDE_FT || 10000;
+                document.getElementById('DISCORD_WEBHOOK_URL').value = cfg.DISCORD_WEBHOOK_URL || '';
+
+                document.getElementById('stat-radius').textContent = `${cfg.ALERT_RADIUS_KM} km`;
+                document.getElementById('stat-altitude').textContent = `${Number(cfg.MAX_ALTITUDE_FT).toLocaleString()} ft`;
+                
+                try {
+                    const host = new URL(cfg.RECEIVER_URL).hostname;
+                    document.getElementById('stat-receiver-host').textContent = host || 'pinas';
+                } catch(e) {
+                    document.getElementById('stat-receiver-host').textContent = 'pinas';
+                }
+
+                initMap(cfg.HOME_LAT, cfg.HOME_LON, cfg.ALERT_RADIUS_KM);
+            } catch(e) {
+                console.error("Failed to load config", e);
+            }
+        }
+
+        async function pollStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                // Status pill update
+                const pill = document.getElementById('system-status-pill');
+                const text = document.getElementById('system-status-text');
+                if (data.fetch_status.success) {
+                    pill.className = "status-pill online";
+                    text.textContent = `Online (${data.fetch_status.count} aircraft in range of feed)`;
+                } else {
+                    pill.className = "status-pill offline";
+                    text.textContent = `Feed Error (${data.fetch_status.message})`;
+                }
+
+                document.getElementById('stat-active-count').textContent = data.active_count;
+
+                // Update active aircraft table & map markers
+                const tbody = document.getElementById('active-aircraft-tbody');
+                if (data.active_aircraft.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No aircraft currently in 2km geofence</td></tr>';
+                } else {
+                    let html = '';
+                    data.active_aircraft.forEach(ac => {
+                        const callsign = ac.flight || ac.registration || ac.hex;
+                        const fr24Url = ac.flight ? `https://www.flightradar24.com/${ac.flight}` : `https://www.flightradar24.com/data/aircraft/${ac.hex.toLowerCase()}`;
+                        const adsbUrl = `https://globe.adsbexchange.com/?icao=${ac.hex.toLowerCase()}`;
+                        
+                        html += `
+                            <tr>
+                                <td>
+                                    <strong>${callsign}</strong>
+                                    <div class="sub-text">${ac.hex} | ${ac.type || 'N/A'}</div>
+                                </td>
+                                <td><span class="badge badge-sky">${ac.distance_km} km</span></td>
+                                <td>${Number(ac.alt_ft).toLocaleString()} ft</td>
+                                <td>${ac.gs} kts</td>
+                                <td>
+                                    <div class="link-group">
+                                        <a href="${fr24Url}" target="_blank" class="link-btn"><i class="fa-solid fa-up-right-from-square"></i> FR24</a>
+                                        <a href="${adsbUrl}" target="_blank" class="link-btn link-btn-adsb"><i class="fa-solid fa-globe"></i> ADSBEx</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+
+                        // Update Leaflet airplane markers
+                        if (ac.lat && ac.lon) {
+                            if (!acMarkers[ac.hex]) {
+                                const planeIcon = L.divIcon({
+                                    className: 'plane-marker',
+                                    html: `<i class="fa-solid fa-plane" style="transform: rotate(${ac.track - 90}deg); color: #00e5ff; font-size: 18px;"></i>`,
+                                    iconSize: [20, 20],
+                                    iconAnchor: [10, 10]
+                                });
+                                acMarkers[ac.hex] = L.marker([ac.lat, ac.lon], { icon: planeIcon }).addTo(map);
+                            } else {
+                                acMarkers[ac.hex].setLatLng([ac.lat, ac.lon]);
+                            }
+                            acMarkers[ac.hex].bindPopup(`<b>${callsign}</b><br>Dist: ${ac.distance_km} km<br>Alt: ${ac.alt_ft} ft<br><a href="${fr24Url}" target="_blank">FlightRadar24</a> | <a href="${adsbUrl}" target="_blank">ADSB Exchange</a>`);
+                        }
+                    });
+                    tbody.innerHTML = html;
+                }
+
+            } catch(e) {
+                console.error("Poll error", e);
+            }
+        }
+
+        async function pollHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const history = await res.json();
+                const tbody = document.getElementById('history-tbody');
+                if (history.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No alerts dispatched yet</td></tr>';
+                    return;
+                }
+                let html = '';
+                history.forEach(item => {
+                    const ident = item.flight || item.registration || item.hex;
+                    const timeStr = new Date(item.timestamp).toLocaleTimeString();
+                    const fr24Url = item.flight ? `https://www.flightradar24.com/${item.flight}` : `https://www.flightradar24.com/data/aircraft/${item.hex.toLowerCase()}`;
+                    const adsbUrl = `https://globe.adsbexchange.com/?icao=${item.hex.toLowerCase()}`;
+
+                    html += `
+                        <tr>
+                            <td><span class="sub-text">${timeStr}</span></td>
+                            <td><strong>${ident}</strong></td>
+                            <td>${item.distance_km} km</td>
+                            <td>
+                                <div class="link-group">
+                                    <a href="${fr24Url}" target="_blank" class="link-btn"><i class="fa-solid fa-up-right-from-square"></i> FR24</a>
+                                    <a href="${adsbUrl}" target="_blank" class="link-btn link-btn-adsb"><i class="fa-solid fa-globe"></i> ADSBEx</a>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } catch(e) {
+                console.error("History error", e);
+            }
+        }
+
+        document.getElementById('config-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const payload = {};
+            formData.forEach((val, key) => payload[key] = val);
+            
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    alert("Settings saved successfully!");
+                    loadConfig();
+                }
+            } catch(err) {
+                alert("Failed to save settings: " + err);
+            }
+        });
+
+        document.getElementById('btn-test-alert').addEventListener('click', async function() {
+            const webhookUrl = document.getElementById('DISCORD_WEBHOOK_URL').value;
+            if (!webhookUrl) {
+                alert("Please enter a Discord Webhook URL first.");
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+
+            try {
+                const res = await fetch('/api/test-alert', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ webhook_url: webhookUrl })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("🎉 Test Discord alert sent successfully! Check your Discord channel.");
+                } else {
+                    alert("⚠️ Discord Alert failed: " + data.message);
+                }
+            } catch(e) {
+                alert("Error sending test alert: " + e);
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '<i class="fa-paper-plane"></i> Send Test Discord Alert';
+            }
+        });
+
+        // Initialize & loop
+        loadConfig();
+        setInterval(pollStatus, 3000);
+        setInterval(pollHistory, 5000);
+    </script>
+</body>
+</html>

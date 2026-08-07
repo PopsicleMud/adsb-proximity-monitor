@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  adsb-monitor:
+    build: .
+    container_name: adsb-proximity-monitor
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - RECEIVER_URL=http://pinas/tar1090/data/aircraft.json
+      - HOME_LAT=37.7749
+      - HOME_LON=-122.4194
+      - ALERT_RADIUS_KM=2.0
+      - MAX_ALTITUDE_FT=10000
+      - DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR_WEBHOOK_HERE
+      - POLL_INTERVAL_SEC=5
+      - COOLDOWN_MINUTES=15
+      - FETCH_PHOTOS=true
+      - PRIMARY_LINK=flightradar24
+    volumes:
+      - ./data:/app/data
