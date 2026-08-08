@@ -4,7 +4,7 @@ services:
     container_name: adsb-proximity-monitor
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "1090:8000"
     environment:
       - RECEIVER_URL=http://pinas/tar1090/data/aircraft.json
       - HOME_LAT=37.7749
